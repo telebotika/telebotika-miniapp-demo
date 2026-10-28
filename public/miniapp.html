@@ -1,0 +1,1298 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#ffffff" />
+    <title id="page-title">Запись к мастеру</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        console.error("GLOBAL ERROR:", msg, "at", url, "line", lineNo, "col", columnNo);
+        alert("JS Error detected!\n\n" + msg + "\nLine: " + lineNo);
+        return false;
+      };
+    </script>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--tg-theme-text-color, #17212b);
+        background: var(--tg-theme-bg-color, #f3f5f7);
+        --panel: var(--tg-theme-secondary-bg-color, #ffffff);
+        --hint: var(--tg-theme-hint-color, #707579);
+        --line: var(--tg-theme-section-separator-color, rgba(90, 105, 120, 0.16));
+        --accent: var(--tg-theme-button-color, #2481cc);
+        --accent-text: var(--tg-theme-button-text-color, #ffffff);
+        --link: var(--tg-theme-link-color, #2481cc);
+        --danger: #c23c3c;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        margin: 0;
+        background: var(--tg-theme-bg-color, #f3f5f7);
+        color: var(--tg-theme-text-color, #17212b);
+      }
+
+      button,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      button:focus-visible,
+      textarea:focus-visible,
+      #assistant-q:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+        outline-offset: 2px;
+      }
+
+      [hidden] {
+        display: none !important;
+      }
+
+      .app-shell {
+        width: min(100%, 720px);
+        min-height: 100vh;
+        margin: 0 auto;
+        padding: max(18px, env(safe-area-inset-top)) 16px max(28px, env(safe-area-inset-bottom));
+      }
+
+      .topbar {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 22px;
+      }
+
+      .eyebrow {
+        margin: 0 0 5px;
+        color: var(--hint);
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 5px;
+        font-size: clamp(1.55rem, 6vw, 2rem);
+        line-height: 1.12;
+      }
+
+      h2 {
+        margin-bottom: 6px;
+        font-size: 1.28rem;
+      }
+
+      .greeting,
+      .subheading,
+      .muted {
+        color: var(--hint);
+      }
+
+      .greeting {
+        margin: 0;
+        min-height: 1.35em;
+        font-size: 0.92rem;
+      }
+
+      .button {
+        min-height: 44px;
+        padding: 10px 15px;
+        border: 0;
+        border-radius: 13px;
+        background: var(--accent);
+        color: var(--accent-text);
+        font-weight: 700;
+        cursor: pointer;
+        transition: opacity 120ms ease, transform 120ms ease;
+      }
+
+      .button:active:not(:disabled) {
+        transform: translateY(1px);
+      }
+
+      .button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .button-secondary {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--tg-theme-text-color, #17212b);
+      }
+
+      .button-small {
+        min-height: 40px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        white-space: nowrap;
+      }
+
+      .notice {
+        margin: 0 0 18px;
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--panel);
+        line-height: 1.45;
+      }
+
+      .notice[data-tone="error"] {
+        border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+        color: var(--danger);
+      }
+
+      .section-heading {
+        margin-bottom: 14px;
+      }
+
+      .section-heading p {
+        margin-bottom: 0;
+      }
+
+      .service-list,
+      .booking-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .service-card,
+      .booking-card {
+        width: 100%;
+        padding: 17px;
+        border: 1px solid var(--line);
+        border-radius: 17px;
+        background: var(--panel);
+        text-align: left;
+      }
+
+      .service-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        cursor: pointer;
+      }
+
+      .service-card:hover {
+        border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+      }
+
+      .service-title {
+        margin: 0 0 5px;
+        font-weight: 750;
+        font-size: 1.03rem;
+      }
+
+      .service-description {
+        margin: 0;
+        color: var(--hint);
+        font-size: 0.88rem;
+        line-height: 1.4;
+      }
+
+      .service-meta {
+        flex: 0 0 auto;
+        text-align: right;
+      }
+
+      .service-price {
+        display: block;
+        font-size: 1rem;
+        font-weight: 750;
+      }
+
+      .service-duration {
+        display: block;
+        margin-top: 3px;
+        color: var(--hint);
+        font-size: 0.83rem;
+      }
+
+      .back-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 40px;
+        margin: 0 0 16px;
+        padding: 5px 0;
+        border: 0;
+        background: transparent;
+        color: var(--link);
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      .selected-service,
+      .summary-card {
+        margin: 14px 0 18px;
+        padding: 14px 16px;
+        border-radius: 15px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+      }
+
+      .selected-service {
+        color: var(--hint);
+        font-size: 0.92rem;
+      }
+
+      .date-grid,
+      .slot-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .date-option,
+      .slot-option {
+        min-height: 70px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: var(--panel);
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .date-option {
+        display: grid;
+        gap: 3px;
+      }
+
+      .date-option strong {
+        font-size: 0.98rem;
+      }
+
+      .date-option span,
+      .date-option small {
+        color: var(--hint);
+        text-transform: capitalize;
+      }
+
+      .date-option.inactive {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .slot-option {
+        min-height: 52px;
+        text-align: center;
+        font-weight: 750;
+      }
+
+      .slot-option:hover,
+      .date-option:not(:disabled):hover {
+        border-color: var(--accent);
+      }
+
+      .summary-card {
+        display: grid;
+        gap: 7px;
+      }
+
+      .summary-card strong {
+        font-size: 1.05rem;
+      }
+
+      .form-label {
+        display: block;
+        margin: 18px 0 7px;
+        font-weight: 650;
+      }
+
+      textarea {
+        display: block;
+        width: 100%;
+        min-height: 96px;
+        resize: vertical;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--panel);
+        color: inherit;
+      }
+
+      #assistant-q {
+        display: block;
+        width: 100%;
+        min-height: 48px;
+        margin: 10px 0 12px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--panel);
+        color: inherit;
+        font: inherit;
+      }
+
+      .full-width {
+        width: 100%;
+        margin-top: 16px;
+      }
+
+      .success-panel {
+        padding: 23px 18px;
+        border: 1px solid var(--line);
+        border-radius: 19px;
+        background: var(--panel);
+        text-align: center;
+      }
+
+      .success-mark {
+        display: grid;
+        width: 54px;
+        height: 54px;
+        margin: 0 auto 12px;
+        place-items: center;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+        color: var(--accent);
+        font-size: 1.7rem;
+        font-weight: 800;
+      }
+
+      .success-actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 20px;
+      }
+
+      .booking-card h3 {
+        margin: 0 0 7px;
+        font-size: 1rem;
+      }
+
+      .booking-card p {
+        margin: 4px 0;
+        color: var(--hint);
+        font-size: 0.9rem;
+      }
+
+      .empty-state {
+        padding: 24px 16px;
+        border: 1px dashed var(--line);
+        border-radius: 15px;
+        color: var(--hint);
+        text-align: center;
+      }
+
+      @media (max-width: 420px) {
+        .app-shell {
+          padding-right: 13px;
+          padding-left: 13px;
+        }
+
+        .topbar {
+          align-items: flex-start;
+        }
+
+        .button-small {
+          padding-right: 10px;
+          padding-left: 10px;
+          font-size: 0.88rem;
+        }
+
+        .service-card {
+          padding: 15px 13px;
+          gap: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Демо-мастер</p>
+          <h1>Запись онлайн</h1>
+          <p id="greeting" class="greeting" aria-live="polite">Проверяем Telegram…</p>
+        </div>
+        <button id="open-bookings" class="button button-secondary button-small" type="button">
+          Мои записи
+        </button>
+      </header>
+
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+
+      <section id="screen-catalog" class="screen">
+        <div class="section-heading">
+          <h2>Услуги</h2>
+          <p class="subheading">Выберите услугу, чтобы посмотреть свободное время</p>
+        </div>
+        <div id="services-list" class="service-list">
+          <p class="muted">Загружаем услуги…</p>
+        </div>
+      </section>
+
+      <section id="screen-dates" class="screen" hidden>
+        <button id="back-to-catalog" class="back-button" type="button">← Услуги</button>
+        <div class="section-heading">
+          <h2>Выберите дату</h2>
+          <p class="subheading">Расписание на ближайшие 7 дней</p>
+        </div>
+        <div id="date-service" class="selected-service"></div>
+        <div id="dates-list" class="date-grid"></div>
+      </section>
+
+      <section id="screen-times" class="screen" hidden>
+        <button id="back-to-dates" class="back-button" type="button">← Даты</button>
+        <div class="section-heading">
+          <h2 id="times-heading">Свободное время</h2>
+          <p id="times-subheading" class="subheading"></p>
+        </div>
+        <div id="slots-list" class="slot-grid"></div>
+      </section>
+
+      <section id="screen-confirm" class="screen" hidden>
+        <button id="back-to-times" class="back-button" type="button">← Ко времени</button>
+        <div class="section-heading">
+          <h2>Подтверждение</h2>
+          <p class="subheading">Проверьте услугу и время записи</p>
+        </div>
+        <div id="booking-summary" class="summary-card"></div>
+        <label class="form-label" for="booking-comment">Комментарий мастеру (необязательно)</label>
+        <textarea id="booking-comment" maxlength="1000" placeholder="Например, пожелания к записи"></textarea>
+        <button id="submit-booking" class="button full-width" type="button">Записаться</button>
+      </section>
+
+      <section id="screen-success" class="screen" hidden>
+        <div class="success-panel">
+          <div class="success-mark" aria-hidden="true">✓</div>
+          <h2>Вы записаны</h2>
+          <p id="success-details" class="muted"></p>
+          <div class="success-actions">
+            <button id="success-catalog" class="button" type="button">Вернуться в каталог</button>
+            <button id="success-bookings" class="button button-secondary" type="button">Мои записи</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="screen-bookings" class="screen" hidden>
+        <button id="bookings-catalog" class="back-button" type="button">← В каталог</button>
+        <div class="section-heading">
+          <h2>Мои записи</h2>
+          <p class="subheading">Ваши бронирования</p>
+        </div>
+        <div id="bookings-list" class="booking-list"></div>
+      </section>
+      <section id="screen-admin" class="screen" hidden>
+        <div class="section-heading">
+          <h2>Журнал салона</h2>
+          <p id="admin-count" class="subheading"></p>
+        </div>
+        <button id="admin-export" class="button button-secondary button-small" type="button" style="margin-bottom:14px">Скачать базу клиентов (CSV)</button>
+        <div id="admin-list" class="booking-list"></div>
+      </section>
+      <section class="card" style="margin:12px;padding:12px">
+        <h2>💬 Помощник</h2>
+        <input
+          id="assistant-q"
+          type="text"
+          maxlength="500"
+          placeholder="Вопрос помощнику…"
+          aria-label="Вопрос помощнику"
+        >
+        <button id="assistant-btn" type="button">Спросить</button>
+        <p id="assistant-answer" class="muted"></p>
+      </section>
+    </main>
+
+    <script>
+      const MASTER_TIME_ZONE = "Europe/Moscow";
+      const state = {
+        services: [],
+        workingHours: [],
+        selectedService: null,
+        selectedDate: null,
+        slots: [],
+        selectedSlot: null,
+      };
+
+      const datePartsFormatter = new Intl.DateTimeFormat("en-GB", {
+        timeZone: MASTER_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+      const dateLabelFormatter = new Intl.DateTimeFormat("ru-RU", {
+        timeZone: MASTER_TIME_ZONE,
+        day: "numeric",
+        month: "long",
+      });
+      const weekdayFormatter = new Intl.DateTimeFormat("ru-RU", {
+        timeZone: MASTER_TIME_ZONE,
+        weekday: "long",
+      });
+      const appointmentFormatter = new Intl.DateTimeFormat("ru-RU", {
+        timeZone: MASTER_TIME_ZONE,
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const currencyFormatter = new Intl.NumberFormat("ru-RU", {
+        maximumFractionDigits: 2,
+      });
+
+      const notice = document.getElementById("notice");
+      const screenNames = ["catalog", "dates", "times", "confirm", "success", "bookings", "admin"];
+
+      function currentInitDataRaw() {
+        return window.Telegram?.WebApp?.initData ?? "";
+      }
+
+      function telegramHeaders() {
+        const initDataRaw = currentInitDataRaw();
+        return initDataRaw ? { "X-Telegram-Init-Data": initDataRaw } : {};
+      }
+
+      function setNotice(message = "", tone = "info") {
+        notice.textContent = message;
+        notice.dataset.tone = tone;
+        notice.hidden = !message;
+      }
+
+      function showScreen(name) {
+        for (const screenName of screenNames) {
+          document.getElementById(`screen-${screenName}`).hidden = screenName !== name;
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      async function readJson(response) {
+        try {
+          return await response.json();
+        } catch {
+          return null;
+        }
+      }
+
+      function formatDateKey(year, month, day) {
+        return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      }
+
+      function moscowTodayKey() {
+        const parts = Object.fromEntries(
+          datePartsFormatter
+            .formatToParts(new Date())
+            .map(({ type, value }) => [type, value]),
+        );
+        return `${parts.year}-${parts.month}-${parts.day}`;
+      }
+
+      function addCalendarDays(dateKey, count) {
+        const [year, month, day] = dateKey.split("-").map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day + count));
+        return formatDateKey(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate());
+      }
+
+      function weekdayForDate(dateKey) {
+        const [year, month, day] = dateKey.split("-").map(Number);
+        return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+      }
+
+      function dateAtSafeNoon(dateKey) {
+        const [year, month, day] = dateKey.split("-").map(Number);
+        return new Date(Date.UTC(year, month - 1, day, 12));
+      }
+
+      function humanDate(dateKey) {
+        const date = dateAtSafeNoon(dateKey);
+        const weekday = weekdayFormatter.format(date);
+        const dateText = dateLabelFormatter.format(date);
+        return `${weekday.charAt(0).toUpperCase()}${weekday.slice(1)}, ${dateText}`;
+      }
+
+      function formatLocalDateTime(isoValue) {
+        return appointmentFormatter.format(new Date(isoValue));
+      }
+
+      function money(value) {
+        return `${currencyFormatter.format(Number(value))} ₽`;
+      }
+
+      function emptyState(message) {
+        const element = document.createElement("p");
+        element.className = "empty-state";
+        element.textContent = message;
+        return element;
+      }
+      // Загрузка бренда с бэкенда (/api/brand). Фронт НЕ читает process.env напрямую —
+      // это серверная переменная, недоступная браузеру. Нужен HTTP-запрос к нашему API.
+      // Дефолты здесь = старые литералы, чтобы при сетевой ошибке фронт не упал белым экраном.
+      async function loadBrand() {
+        try {
+          const response = await fetch("/api/brand");
+          if (!response.ok) throw new Error("brand unavailable");
+          const brand = await readJson(response);
+
+          // Подставляем бренд в DOM элементы по их id/class
+          const titleEl = document.querySelector("title");
+          if (titleEl && brand.title) titleEl.textContent = brand.title;
+
+          const eyebrowEl = document.querySelector(".eyebrow");
+          if (eyebrowEl && brand.name) eyebrowEl.textContent = brand.name;
+
+          const h1El = document.querySelector("h1");
+          if (h1El && brand.tagline) h1El.textContent = brand.tagline;
+
+          return brand; // возвращаем объект для дальнейшего использования (например, кнопки «О преподавателе»)
+        } catch {
+          // Сетевая ошибка / бэк не поднялся / эндпоинт недоступен -> оставляем дефолтные литералы из HTML
+          console.warn("Failed to load brand, using defaults from HTML");
+          return null;
+        }
+      }
+      async function loadIdentity() {
+        const greeting = document.getElementById("greeting");
+        try {
+          const response = await fetch("/api/auth/init-data", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ initDataRaw: currentInitDataRaw() }),
+          });
+          const result = await readJson(response);
+          if (response.ok && result?.valid === true && result.firstName) {
+            greeting.textContent = `Привет, ${result.firstName}`;
+          } else {
+            greeting.textContent =
+              "Не удалось подтвердить личность. Откройте приложение через кнопку бота.";
+          }
+        } catch {
+          greeting.textContent = "Не удалось проверить личность Telegram.";
+        }
+      }
+
+      function renderServices() {
+        const list = document.getElementById("services-list");
+        list.replaceChildren();
+        if (state.services.length === 0) {
+          list.append(emptyState("Пока нет доступных услуг."));
+          return;
+        }
+
+        for (const service of state.services) {
+          const card = document.createElement("button");
+          card.className = "service-card";
+          card.type = "button";
+
+          const text = document.createElement("div");
+          const title = document.createElement("p");
+          title.className = "service-title";
+          title.textContent = service.name;
+          text.append(title);
+          if (service.description) {
+            const description = document.createElement("p");
+            description.className = "service-description";
+            description.textContent = service.description;
+            text.append(description);
+          }
+
+          const meta = document.createElement("div");
+          meta.className = "service-meta";
+          const price = document.createElement("span");
+          price.className = "service-price";
+          price.textContent = money(service.price);
+          const duration = document.createElement("span");
+          duration.className = "service-duration";
+          duration.textContent = `${service.duration_minutes} мин`;
+          meta.append(price, duration);
+          card.append(text, meta);
+
+          card.addEventListener("click", () => {
+            state.selectedService = service;
+            state.selectedDate = null;
+            state.selectedSlot = null;
+            document.getElementById("date-service").textContent =
+              `${service.name} · ${money(service.price)} · ${service.duration_minutes} мин`;
+            renderDates();
+            setNotice();
+            showScreen("dates");
+          });
+          list.append(card);
+        }
+      }
+
+      function renderDates() {
+        const list = document.getElementById("dates-list");
+        list.replaceChildren();
+        const today = moscowTodayKey();
+        const scheduleByWeekday = new Map(
+          state.workingHours.map((item) => [Number(item.weekday), item]),
+        );
+
+        for (let offset = 0; offset < 7; offset += 1) {
+          const dateKey = addCalendarDays(today, offset);
+          const weekday = weekdayForDate(dateKey);
+          const schedule = scheduleByWeekday.get(weekday);
+          const isWorking = Boolean(schedule?.is_working_day);
+          const date = dateAtSafeNoon(dateKey);
+          const weekdayText = weekdayFormatter.format(date);
+          const dateText = dateLabelFormatter.format(date);
+
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = `date-option${isWorking ? "" : " inactive"}`;
+          button.disabled = !isWorking;
+          button.setAttribute(
+            "aria-label",
+            `${weekdayText}, ${dateText}${isWorking ? "" : ", выходной"}`,
+          );
+
+          const weekdayElement = document.createElement("span");
+          weekdayElement.textContent = weekdayText;
+          const dateElement = document.createElement("strong");
+          dateElement.textContent = dateText;
+          button.append(weekdayElement, dateElement);
+          if (!isWorking) {
+            const closed = document.createElement("small");
+            closed.textContent = "Выходной";
+            button.append(closed);
+          }
+
+          if (isWorking) {
+            button.addEventListener("click", () => openDate(dateKey));
+          }
+          list.append(button);
+        }
+      }
+
+      async function loadServices() {
+        const response = await fetch("/api/services", {
+          headers: telegramHeaders(),
+        });
+        const services = await readJson(response);
+        if (!response.ok || !Array.isArray(services)) {
+          throw new Error("Unable to load services");
+        }
+        state.services = services;
+        renderServices();
+      }
+
+      async function loadWorkingHours() {
+        const response = await fetch("/api/working-hours", {
+          headers: telegramHeaders(),
+        });
+        const hours = await readJson(response);
+        if (!response.ok || !Array.isArray(hours)) {
+          throw new Error("Unable to load schedule");
+        }
+        state.workingHours = hours;
+      }
+
+      async function fetchSlotsForSelectedDate() {
+        if (!state.selectedService || !state.selectedDate) {
+          throw new Error("A service and date are required");
+        }
+        const params = new URLSearchParams({
+          date: state.selectedDate,
+          service_id: String(state.selectedService.id),
+        });
+        const response = await fetch(`/api/slots?${params.toString()}`, {
+          headers: telegramHeaders(),
+        });
+        const slots = await readJson(response);
+        if (!response.ok || !Array.isArray(slots)) {
+          if (response.status === 403) {
+            throw new Error("Не удалось подтвердить личность. Откройте приложение через кнопку бота.");
+          }
+          throw new Error("Не удалось загрузить свободное время.");
+        }
+        state.slots = slots;
+        renderSlots();
+      }
+
+      async function openDate(dateKey) {
+        state.selectedDate = dateKey;
+        state.selectedSlot = null;
+        setNotice();
+        document.getElementById("times-heading").textContent = humanDate(dateKey);
+        document.getElementById("times-subheading").textContent =
+          `${state.selectedService.name} · ${state.selectedService.duration_minutes} мин`;
+        showScreen("times");
+        document.getElementById("slots-list").replaceChildren(
+          emptyState("Загружаем свободное время…"),
+        );
+        try {
+          await fetchSlotsForSelectedDate();
+          if (state.slots.length === 0) {
+            setNotice("На эту дату свободных слотов нет.");
+          }
+        } catch (error) {
+          setNotice(error.message || "Не удалось загрузить свободное время.", "error");
+        }
+      }
+
+      function renderSlots() {
+        const list = document.getElementById("slots-list");
+        list.replaceChildren();
+        if (state.slots.length === 0) {
+          list.append(emptyState("На эту дату свободных слотов нет."));
+          return;
+        }
+
+        for (const slot of state.slots) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "slot-option";
+          button.textContent = slot.local_time;
+          button.addEventListener("click", () => {
+            state.selectedSlot = slot;
+            const summary = document.getElementById("booking-summary");
+            summary.replaceChildren();
+            const service = document.createElement("strong");
+            service.textContent = state.selectedService.name;
+            const when = document.createElement("span");
+            when.textContent = formatLocalDateTime(slot.starts_at);
+            const price = document.createElement("span");
+            price.className = "muted";
+            price.textContent = `${money(state.selectedService.price)} · ${state.selectedService.duration_minutes} мин`;
+            summary.append(service, when, price);
+            setNotice();
+            showScreen("confirm");
+          });
+          list.append(button);
+        }
+      }
+
+      async function submitBooking() {
+        if (!state.selectedService || !state.selectedSlot) {
+          setNotice("Сначала выберите свободное время.", "error");
+          return;
+        }
+
+        const button = document.getElementById("submit-booking");
+        button.disabled = true;
+        setNotice();
+        const payload = {
+          initDataRaw: currentInitDataRaw(),
+          service_id: state.selectedService.id,
+          starts_at: state.selectedSlot.starts_at,
+        };
+        const comment = document.getElementById("booking-comment").value.trim();
+        if (comment) {
+          payload.comment = comment;
+        }
+
+        try {
+          const response = await fetch("/api/bookings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = await readJson(response);
+
+          if (response.status === 201) {
+            document.getElementById("success-details").textContent =
+              `${state.selectedService.name}, ${formatLocalDateTime(result.starts_at)}`;
+            document.getElementById("booking-comment").value = "";
+            state.selectedSlot = null;
+            setNotice();
+            showScreen("success");
+            return;
+          }
+
+          if (response.status === 409) {
+            state.selectedSlot = null;
+            showScreen("times");
+            try {
+              await fetchSlotsForSelectedDate();
+              setNotice("Это время только что заняли. Список обновлён.", "error");
+            } catch (error) {
+              setNotice(error.message || "Не удалось обновить свободное время.", "error");
+            }
+            return;
+          }
+
+          if (response.status === 403) {
+            setNotice(
+              "Не удалось подтвердить личность. Откройте приложение через кнопку бота.",
+              "error",
+            );
+            return;
+          }
+
+          if (response.status === 422) {
+            setNotice("Время вне графика мастера, выберите другое.", "error");
+            return;
+          }
+
+          setNotice("Не удалось создать запись. Попробуйте ещё раз.", "error");
+        } catch {
+          setNotice("Не удалось связаться с сервером. Попробуйте ещё раз.", "error");
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      function renderBookings(bookings) {
+        const list = document.getElementById("bookings-list");
+        list.replaceChildren();
+        if (bookings.length === 0) {
+          list.append(emptyState("Записей пока нет"));
+          return;
+        }
+
+        const statusLabels = {
+          pending: "Ожидает подтверждения",
+          confirmed: "Подтверждена",
+          cancelled: "Отменена",
+          completed: "Завершена",
+          no_show: "Неявка",
+        };
+        for (const booking of bookings) {
+          const card = document.createElement("article");
+          card.className = "booking-card";
+          const title = document.createElement("h3");
+          title.textContent = booking.service_name;
+          const when = document.createElement("p");
+          when.textContent = formatLocalDateTime(booking.starts_at);
+          const price = document.createElement("p");
+          price.textContent = money(booking.service_price);
+          const status = document.createElement("p");
+          status.textContent = statusLabels[booking.status] ?? booking.status;
+          card.append(title, when, price, status);
+          list.append(card);
+        }
+      }
+
+      async function loadMyBookings() {
+        setNotice();
+        const initDataRaw = currentInitDataRaw();
+        const params = new URLSearchParams({ initDataRaw });
+        try {
+          const response = await fetch(`/api/my-bookings?${params.toString()}`);
+          const bookings = await readJson(response);
+          showScreen("bookings");
+          if (response.status === 403) {
+            document.getElementById("bookings-list").replaceChildren();
+            setNotice(
+              "Не удалось подтвердить личность. Откройте приложение через кнопку бота.",
+              "error",
+            );
+            return;
+          }
+          if (!response.ok || !Array.isArray(bookings)) {
+            throw new Error("Не удалось загрузить ваши записи.");
+          }
+          renderBookings(bookings);
+        } catch (error) {
+          document.getElementById("bookings-list").replaceChildren();
+          showScreen("bookings");
+          setNotice(error.message || "Не удалось загрузить ваши записи.", "error");
+        }
+      }
+
+      // Пробник роли: стучимся в кабинет. Сервер сам решает (подпись + ADMIN_CHAT_ID),
+      // клиент видит только вердикт 200/403 и НЕ знает секретного ID.
+      // Возвращает массив строк журнала, если мастер; null — если клиент/ошибка/не в Telegram.
+      async function probeAdmin() {
+        const initDataRaw = currentInitDataRaw();
+        if (!initDataRaw) return null; // открыто вне Telegram -> клиентский режим
+        const params = new URLSearchParams({ initDataRaw });
+        try {
+          const response = await fetch(`/api/admin/bookings?${params.toString()}`);
+          if (response.status !== 200) return null; // 403 или иное -> клиент
+          const rows = await readJson(response);
+          return Array.isArray(rows) ? rows : null;
+        } catch {
+          return null; // сетевой сбой -> безопасно падаем в клиентский режим
+        }
+      }
+
+      // Одно действие мастера над записью: confirm или cancel.
+      // Шлём initDataRaw в ТЕЛЕ запроса (не в URL): так подпись не оседает в логах
+      // прокси и браузера, а requireAdmin на бэке читает и тело, и query — совместимо.
+      // buttons = массив обеих кнопок карточки: дизейблим обе на время запроса,
+      // чтобы двойной клик не отправил два POST подряд.
+      async function adminAction(bookingId, action, buttons) {
+        const initDataRaw = currentInitDataRaw();
+        if (!initDataRaw) {
+          setNotice("Нет Telegram-подписи. Откройте журнал через кнопку бота.", "error");
+          return;
+        }
+        for (const b of buttons) b.disabled = true;
+        setNotice();
+        try {
+          const response = await fetch(`/api/admin/bookings/${bookingId}/${action}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ initDataRaw }),
+          });
+
+          if (response.status === 200) {
+            // Успех: сервер уже применил изменение. Перечитываем журнал ЦЕЛИКОМ
+            // через тот же probeAdmin — так счётчик и список всегда согласованы
+            // с реальным состоянием БД, а не с тем, что мы «думаем» на фронте.
+            const refreshed = await probeAdmin();
+            if (refreshed !== null) renderAdminFeed(refreshed);
+            return;
+          }
+          if (response.status === 403) {
+            setNotice("Не удалось подтвердить доступ мастера. Обновите страницу.", "error");
+            for (const b of buttons) b.disabled = false;
+            return;
+          }
+          if (response.status === 404) {
+            // Записи уже нет (например, её отменили параллельно) — обновляем ленту.
+            setNotice("Такой записи уже нет. Обновляю журнал.", "error");
+            const refreshed = await probeAdmin();
+            if (refreshed !== null) renderAdminFeed(refreshed);
+            return;
+          }
+          setNotice("Не удалось обновить запись. Попробуйте ещё раз.", "error");
+          for (const b of buttons) b.disabled = false;
+        } catch {
+          setNotice("Нет связи с сервером. Попробуйте ещё раз.", "error");
+          for (const b of buttons) b.disabled = false;
+        }
+      }
+      // Скачивание CSV: fetch с подписью в query -> проверка статуса -> blob ->
+      // временная ссылка в памяти -> программный клик по скрытой <a download>.
+      // Голая <a href> дала бы 403, потому что браузер не приложил бы initData.
+      async function downloadAdminCsv() {
+        const initDataRaw = currentInitDataRaw();
+        if (!initDataRaw) {
+          setNotice("Нет Telegram-подписи. Откройте журнал через кнопку бота.", "error");
+          return;
+        }
+        const btn = document.getElementById("admin-export");
+        btn.disabled = true;
+        setNotice();
+        try {
+          const params = new URLSearchParams({ initDataRaw });
+          const response = await fetch(`/api/admin/export.csv?${params.toString()}`);
+          if (response.status === 403) {
+            setNotice("Не удалось подтвердить доступ мастера. Обновите страницу.", "error");
+            return;
+          }
+          if (!response.ok) {
+            setNotice("Не удалось выгрузить файл. Попробуйте ещё раз.", "error");
+            return;
+          }
+          // Песочница Mini App режет программное скачивание (и blob, и <a download>)
+          // молча, без JS-ошибки. Канонический выход наружу — Telegram.WebApp.openLink:
+          // он открывает ссылку в системном браузере, где attachment скачивается.
+          // Нужен АБСОЛЮТНЫЙ URL (origin + путь), иначе openLink не поймёт, куда идти.
+          const signedUrl = `${window.location.origin}/api/admin/export.csv?${params.toString()}`;
+          const tg = window.Telegram?.WebApp;
+          if (tg && typeof tg.openLink === "function") {
+            tg.openLink(signedUrl);
+          } else {
+            // Страховка вне Telegram (Preview/инкогнито): обычная навигация скачает attachment.
+            window.location.href = signedUrl;
+            setNotice("Открываю файл в браузере…", "info");
+          }
+         // гигиена: освобождаем временную ссылку из памяти
+        } catch (e) {
+          console.error("export failed:", e);
+          setNotice("Не удалось выгрузить файл. Попробуйте ещё раз.", "error");
+        } finally {
+          btn.disabled = false;
+        }
+      }
+      // Отрисовка журнала салона (только чтение для 3.3b-1; кнопки появятся в 3.3b-2).
+      function renderAdminFeed(rows) {
+        const list = document.getElementById("admin-list");
+        list.replaceChildren();
+        const countEl = document.getElementById("admin-count");
+        if (countEl) {
+          countEl.textContent =
+            rows.length > 0 ? `Активных записей впереди: ${rows.length}` : "Очередь пуста";
+        }
+        if (rows.length === 0) {
+          list.append(emptyState("Предстоящих активных записей нет."));
+          return;
+        }
+        // Та же легенда статусов, что и в клиентских «Моих записях» (дублируем намеренно,
+        // чтобы не переписывать рабочую renderBookings — меньше движений, меньше риск).
+        const statusLabels = {
+          pending: "Ожидает подтверждения",
+          confirmed: "Подтверждена",
+          cancelled: "Отменена",
+          completed: "Завершена",
+          no_show: "Неявка",
+        };
+        for (const booking of rows) {
+          const card = document.createElement("article");
+          card.className = "booking-card";
+
+          const title = document.createElement("h3");
+          title.textContent = `${booking.first_name || "Клиент"} · ${booking.service_name}`;
+
+          const when = document.createElement("p");
+          when.textContent = formatLocalDateTime(booking.starts_at);
+
+          const price = document.createElement("p");
+          price.textContent = money(booking.service_price);
+
+          const who = document.createElement("p");
+          who.className = "muted";
+          who.textContent = `Telegram ID клиента: ${booking.telegram_user_id}`;
+
+          const status = document.createElement("p");
+          status.textContent = statusLabels[booking.status] ?? booking.status;
+
+          card.append(title, when, price, who, status);
+
+          if (booking.comment) {
+            const comment = document.createElement("p");
+            comment.className = "muted";
+            comment.textContent = `Комментарий: ${booking.comment}`;
+            card.append(comment);
+          }
+          // --- кнопки мастера (3.3b-2) ---
+          const actions = document.createElement("div");
+          // Инлайн-обёртка вместо нового CSS-класса: минимум движений в файле,
+          // который уже доказан рабочим. Косметический долг — в проде вынесем в класс.
+          actions.style.cssText = "display:flex;gap:8px;margin-top:12px;flex-wrap:wrap";
+          const cardButtons = [];
+
+          // "Подтвердить" показываем только для pending: на confirmed жать её бессмысленно.
+          if (booking.status === "pending") {
+            const confirmBtn = document.createElement("button");
+            confirmBtn.type = "button";
+            confirmBtn.className = "button button-small";
+            confirmBtn.textContent = "Подтвердить";
+            confirmBtn.addEventListener("click", () =>
+              adminAction(booking.id, "confirm", cardButtons),
+            );
+            actions.append(confirmBtn);
+            cardButtons.push(confirmBtn);
+          }
+
+          // "Отменить" доступна и для pending, и для confirmed (мастер передумал).
+          const cancelBtn = document.createElement("button");
+          cancelBtn.type = "button";
+          cancelBtn.className = "button button-small";
+          cancelBtn.style.cssText = "background:var(--danger);color:#fff";
+          cancelBtn.textContent = "Отменить";
+          cancelBtn.addEventListener("click", () =>
+            adminAction(booking.id, "cancel", cardButtons),
+          );
+          actions.append(cancelBtn);
+          cardButtons.push(cancelBtn);
+
+          card.append(actions);
+          list.append(card);
+        }
+      }
+      document.getElementById("back-to-catalog").addEventListener("click", () => {
+        setNotice();
+        showScreen("catalog");
+      });
+      document.getElementById("back-to-dates").addEventListener("click", () => {
+        setNotice();
+        showScreen("dates");
+      });
+      document.getElementById("back-to-times").addEventListener("click", () => {
+        setNotice();
+        showScreen("times");
+      });
+      document.getElementById("submit-booking").addEventListener("click", submitBooking);
+      document.getElementById("open-bookings").addEventListener("click", loadMyBookings);
+      document.getElementById("admin-export").addEventListener("click", downloadAdminCsv);
+      document.getElementById("success-bookings").addEventListener("click", loadMyBookings);
+      document.getElementById("bookings-catalog").addEventListener("click", () => {
+        setNotice();
+        showScreen("catalog");
+      });
+      document.getElementById("success-catalog").addEventListener("click", () => {
+        state.selectedService = null;
+        state.selectedDate = null;
+        state.selectedSlot = null;
+        setNotice();
+        showScreen("catalog");
+      });
+
+      async function initialize() {
+        const telegramApp = window.Telegram?.WebApp;
+        if (telegramApp) {
+          telegramApp.ready();
+          telegramApp.expand();
+        }
+        // Грузим бренд ДО определения роли: шапка должна быть правильной независимо от того,
+        // мастер это или клиент. Один быстрый GET без подписи (эндпоинт публичный).
+        await loadBrand();
+        // Сначала узнаём роль у сервера (один лёгкий GET). Это единственная развилка.
+        const adminRows = await probeAdmin();
+
+        if (adminRows !== null) {
+          // МАСТЕР: показываем журнал, скрываем каталог до того, как он успеет мигнуть.
+          showScreen("admin");
+          await loadIdentity();          // приветствие в шапке
+          renderAdminFeed(adminRows);    // журнал уже в руках, не дёргаем сервер второй раз
+          // Каталог грузим в фоне БЕЗ await — чтобы кнопки «Мои записи» -> «В каталог»
+          // вели на живой каталог, а не на пустой экран (страховка от «мёртвого каталога»).
+          loadServices().catch(() => {});
+          loadWorkingHours().catch(() => {});
+          return;
+        }
+
+        // КЛИЕНТ: путь побайтово совпадает с прежним, ничего не сломано.
+        await loadIdentity();
+        try {
+          await loadServices();
+        } catch {
+          document.getElementById("services-list").replaceChildren(
+            emptyState("Не удалось загрузить услуги."),
+          );
+        }
+        try {
+          await loadWorkingHours();
+        } catch {
+          state.workingHours = [];
+          setNotice("Не удалось загрузить расписание мастера.", "error");
+        }
+      }
+
+      initialize();
+
+    </script>
+    <script>
+      (function () {
+        var btn = document.getElementById("assistant-btn");
+        var questionInput = document.getElementById("assistant-q");
+        var out = document.getElementById("assistant-answer");
+        if (!btn) return;
+        btn.addEventListener("click", async function () {
+          out.textContent = "Думаю…";
+          try {
+            var payload = { initDataRaw: currentInitDataRaw() };
+            var question = questionInput.value.trim();
+            if (question) payload.question = question;
+            var r = await fetch("/api/assistant", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+            var data = await r.json();
+            out.textContent = r.ok ? data.answer : "Не удалось ответить: " + r.status;
+          } catch (e) {
+            out.textContent = "Помощник недоступен.";
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

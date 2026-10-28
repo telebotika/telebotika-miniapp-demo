@@ -1,0 +1,15 @@
+{
+  "name": "tg-miniapp-boilerplate",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "NODE_EXTRA_CA_CERTS=certs/russian_trusted_root_ca_pem.crt node server.js",
+    "dev": "NODE_EXTRA_CA_CERTS=certs/russian_trusted_root_ca_pem.crt node --watch server.js",
+    "set-webhook": "if [ -z \"$BOT_TOKEN\" ]; then echo 'BOT_TOKEN is not set' >&2; exit 1; fi; if [ -n \"$WEBHOOK_SECRET\" ]; then curl -sS -X POST \"https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://$REPLIT_DEV_DOMAIN/bot/webhook&secret_token=$WEBHOOK_SECRET\"; else curl -sS -X POST \"https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://$REPLIT_DEV_DOMAIN/bot/webhook\"; fi"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "pg": "^8.23.0"
+  }
+}
