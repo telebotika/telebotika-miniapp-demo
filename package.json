@@ -9,7 +9,9 @@
     "set-webhook": "if [ -z \"$BOT_TOKEN\" ]; then echo 'BOT_TOKEN is not set' >&2; exit 1; fi; if [ -n \"$WEBHOOK_SECRET\" ]; then curl -sS -X POST \"https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://$REPLIT_DEV_DOMAIN/bot/webhook&secret_token=$WEBHOOK_SECRET\"; else curl -sS -X POST \"https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=https://$REPLIT_DEV_DOMAIN/bot/webhook\"; fi"
   },
   "dependencies": {
+    "@netlify/functions": "^6.0.3",
     "express": "^5.2.1",
-    "pg": "^8.23.0"
+    "pg": "^8.23.0",
+    "serverless-http": "^4.0.0"
   }
 }

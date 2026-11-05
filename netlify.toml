@@ -1,0 +1,42 @@
+[build]
+  command = "echo Preparing Netlify demo"
+  publish = "public"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[functions]
+  external_node_modules = ["express", "pg"]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/bot/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/health"
+  to = "/.netlify/functions/api/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/miniapp"
+  to = "/miniapp.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/"
+  to = "/miniapp.html"
+  status = 200
+  force = true
+
