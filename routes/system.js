@@ -5,7 +5,15 @@ import { askAssistant } from "../utils/ai-provider.js";
 
 const router = Router();
 const { Pool } = pg;
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 3,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 15000,
+  allowExitOnIdle: true,
+});
+// Supabase закрывает простаивающие соединения: без обработчика такой обрыв роняет процесс.
+pool.on("error", () => {});
 const MASTER_TIME_ZONE = "Europe/Moscow";
 const SLOT_STEP_SECONDS = 30 * 60;
 const BOOKING_RATE_WINDOW_MS = 60_000;
@@ -474,9 +482,14 @@ router.post("/api/bookings", async (request, response) => {
     return response.status(429).json({ error: "Too many requests" });
   }
 
-  if (!validation.valid) {
+  // Демо-режим: запись из браузера без подписи Telegram (только при DEMO_MODE=1).
+  const demoMode = process.env.DEMO_MODE === "1";
+  if (!validation.valid && !demoMode) {
     return response.status(403).json({ error: "Invalid signature" });
   }
+  const identity = validation.valid
+    ? { userId: validation.userId, firstName: validation.firstName, demo: false }
+    : { userId: 1000000001, firstName: "Гость (демо)", demo: true };
 
   const serviceId = parsePositiveInteger(request.body?.service_id);
   const startsAt = parseIsoInstant(request.body?.starts_at);
@@ -618,7 +631,7 @@ router.post("/api/bookings", async (request, response) => {
       // is mapped to a database user for this booking.
       const userResult = await client.query(
         "INSERT INTO users (telegram_user_id, first_name) VALUES ($1, $2) ON CONFLICT (telegram_user_id) DO UPDATE SET first_name = EXCLUDED.first_name RETURNING id",
-        [String(validation.userId), validation.firstName],
+        [String(identity.userId), identity.firstName],
       );
       const databaseUserId = Number(userResult.rows[0].id);
       const inserted = await client.query(
@@ -638,6 +651,7 @@ router.post("/api/bookings", async (request, response) => {
     void (async () => {
       try {
         const botToken = process.env.BOT_TOKEN;
+        if (identity.demo) throw new Error("demo booking: telegram notice skipped");
         if (!botToken) {
           throw new Error("Telegram bot token is unavailable");
         }
@@ -649,7 +663,7 @@ router.post("/api/bookings", async (request, response) => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               // In a private chat, Telegram chat_id equals the authenticated user.id.
-              chat_id: validation.userId,
+              chat_id: identity.userId,
               text: confirmationText,
             }),
             signal: AbortSignal.timeout(5000),
@@ -667,7 +681,7 @@ router.post("/api/bookings", async (request, response) => {
     // The stored FK is users.id; expose the signed Telegram ID as API user_id.
     return response.status(201).json({
       ...booking,
-      user_id: validation.userId,
+      user_id: identity.userId,
     });
   } catch (error) {
     if (error instanceof SlotAlreadyTakenError) {

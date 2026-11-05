@@ -7,7 +7,15 @@ import pg from "pg";
 import { validateInitData } from "../utils/telegram-auth.js";
 
 const router = Router();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 3,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 15000,
+  allowExitOnIdle: true,
+});
+// Supabase закрывает простаивающие соединения: без обработчика такой обрыв роняет процесс.
+pool.on("error", () => {});
 
 // Подпись провайдера: HMAC(secret, payment_id) — та же техника, что в initData,
 // но секрет наш (PAYMENT_WEBHOOK_SECRET). Fail-closed: нет секрета -> null -> 500.

@@ -674,6 +674,9 @@
           const result = await readJson(response);
           if (response.ok && result?.valid === true && result.firstName) {
             greeting.textContent = `Привет, ${result.firstName}`;
+            if (result.demo === true) {
+              setNotice("Демо-режим: данные тестовые, записи не попадут к мастеру.", "info");
+            }
           } else {
             greeting.textContent =
               "Не удалось подтвердить личность. Откройте приложение через кнопку бота.";

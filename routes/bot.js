@@ -4,7 +4,15 @@ import { askAssistant } from "../utils/ai-provider.js";
 import { transcribeAudio, synthesizeSpeech } from "../utils/speech-provider.js";
 
 const router = Router();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 3,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 15000,
+  allowExitOnIdle: true,
+});
+// Supabase закрывает простаивающие соединения: без обработчика такой обрыв роняет процесс.
+pool.on("error", () => {});
 const MASTER_TIME_ZONE = "Europe/Moscow";
 
 let ttsFailStreak = 0;

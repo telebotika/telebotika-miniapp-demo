@@ -13,6 +13,14 @@ const currentDirectory =
     : path.dirname(fileURLToPath(import.meta.url));
 
 app.use(express.json());
+
+// Данные не кешируем: иначе CDN отдаёт старый ответ после правки.
+app.use((request, response, next) => {
+  if (request.path.startsWith("/api") || request.path === "/health") {
+    response.set("Cache-Control", "no-store");
+  }
+  next();
+});
 app.use("/bot", botRoutes);
 app.use("/miniapp", miniappRoutes);
 app.use("/api/admin", adminRoutes);

@@ -20,6 +20,10 @@ router.get("/", (_request, response) => {
 apiRouter.post("/auth/init-data", async (request, response) => {
   const validation = validateInitData(request.body?.initDataRaw);
   if (!validation.valid) {
+    // Демо-режим: открытие в браузере без подписи Telegram (только при DEMO_MODE=1).
+    if (process.env.DEMO_MODE === "1") {
+      return response.json({ valid: true, firstName: "Гость (демо)", demo: true });
+    }
     return response.status(403).json({
       valid: false,
       error: "Invalid signature",

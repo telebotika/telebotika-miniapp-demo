@@ -5,7 +5,15 @@ import pg from "pg";
 import { validateInitData } from "../utils/telegram-auth.js";
 
 const router = Router();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: 3,
+  idleTimeoutMillis: 10000,
+  connectionTimeoutMillis: 15000,
+  allowExitOnIdle: true,
+});
+// Supabase закрывает простаивающие соединения: без обработчика такой обрыв роняет процесс.
+pool.on("error", () => {});
 // Часовая зона мастера для форматирования дат в экспорте.
 // Долг M7: унести в env/seed вместе с MASTER_TIME_ZONE из system.js в общий конфиг.
 const MASTER_TIME_ZONE = "Europe/Moscow";
