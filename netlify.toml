@@ -7,7 +7,7 @@
   NODE_VERSION = "24"
 
 [functions]
-  external_node_modules = ["express", "pg"]
+  external_node_modules = ["express","pg","serverless-http"]
   node_bundler = "esbuild"
 
 [[redirects]]
