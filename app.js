@@ -7,7 +7,10 @@ import miniappRoutes, { apiRouter as miniappApiRoutes } from "./routes/miniapp.j
 import adminRoutes from "./routes/admin.js";
 
 const app = express();
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const currentDirectory =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : path.dirname(fileURLToPath(import.meta.url));
 
 app.use(express.json());
 app.use("/bot", botRoutes);

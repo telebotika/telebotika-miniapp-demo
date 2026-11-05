@@ -6,7 +6,10 @@ import { validateInitData } from "../utils/telegram-auth.js";
 
 const router = Router();
 export const apiRouter = Router();
-const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
+const currentDirectory =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : path.dirname(fileURLToPath(import.meta.url));
 const miniappPage = path.resolve(currentDirectory, "../public/miniapp.html");
 const { Pool } = pg;
 
