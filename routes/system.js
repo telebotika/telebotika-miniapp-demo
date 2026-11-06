@@ -720,7 +720,63 @@ router.post("/api/assistant", async (request, response) => {
       request.body?.initDataRaw ??
       request.query?.initDataRaw,
   );
-  if (!validation.valid) return response.status(403).json({ error: "Invalid signature" });
+  // Демо-режим: помощник отвечает гостю из браузера (только при DEMO_MODE=1).
+  const demoGuest = process.env.DEMO_MODE === "1" && !validation.valid;
+  if (!validation.valid && !demoGuest) {
+    return response.status(403).json({ error: "Invalid signature" });
+  }
+  // ДЕМО-ОТВЕТ: по фактам, без выдумок. Реальный AI включается отдельно (AI_PROVIDER=gigachat).
+  if (demoGuest) {
+    const questionText =
+      typeof request.body?.question === "string" ? request.body.question.trim() : "";
+    try {
+      const servicesResult = await queryDatabase(
+        "SELECT name, price, duration_minutes FROM services WHERE is_active = TRUE ORDER BY sort_order, id",
+      );
+      const services = servicesResult.rows;
+      const nearest = await queryDatabase(
+        `SELECT s.name AS service, s.price, b.starts_at
+         FROM bookings b
+         JOIN services s ON s.id = b.service_id
+         JOIN users u ON u.id = b.user_id
+         WHERE u.telegram_user_id = $1
+           AND b.status IN ('pending', 'confirmed')
+           AND b.starts_at > NOW()
+         ORDER BY b.starts_at ASC
+         LIMIT 1`,
+        ["1000000001"],
+      );
+      const brandName = process.env.BRAND_NAME?.trim() || "Демо-мастер";
+      const priceLine = services
+        .map((s) => `${s.name} — ${Number(s.price)} ₽, ${Number(s.duration_minutes)} мин`)
+        .join("; ");
+      const lines = [
+        questionText ? `Демо-ответ на ваш вопрос: «${questionText}».` : "Демо-ответ помощника.",
+        services.length
+          ? `Услуги: ${priceLine}.`
+          : "Прайс пока пуст.",
+      ];
+      const row = nearest.rows[0];
+      if (row) {
+        const when = new Date(row.starts_at).toLocaleString("ru-RU", {
+          timeZone: MASTER_TIME_ZONE,
+          day: "numeric",
+          month: "long",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+        lines.push(`Ближайшая запись гостя: ${row.service}, ${when}.`);
+      } else {
+        lines.push("Активных записей у гостя нет — выберите услугу в каталоге.");
+      }
+      lines.push(
+        `Это демо-ответ по данным каталога, а не разговор с AI. Записаться можно в разделе «Услуги». Мастер: ${brandName}.`,
+      );
+      return response.json({ provider: "demo", answer: lines.join(" ") });
+    } catch {
+      return response.status(500).json({ error: "Assistant is unavailable" });
+    }
+  }
 
   const question = request.body?.question;
   if (

@@ -1539,7 +1539,7 @@
             if (question) payload.question = question;
             var r = await fetch("/api/assistant", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: { ...telegramHeaders(), "Content-Type": "application/json" },
               body: JSON.stringify(payload),
             });
             var data = await r.json();
