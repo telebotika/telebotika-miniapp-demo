@@ -208,62 +208,165 @@ router.get("/export.csv", requireAdmin, async (_request, response) => {
 // урок Модуля 5 — литерал 'MASTER_TIME_ZONE' спал до первой брони и будился 500-ми.
 const REPORT_TZ = "Europe/Moscow"; // долг M7: унести в env/seed вместе с MASTER_TIME_ZONE
 
+
+// === АНАЛИТИКА ДЛЯ СОБСТВЕННИКА ===
+// Периоды: 7 и 30 дней (по сегодня включительно), текущий месяц, всё время.
+// Все даты считаются в часовом поясе мастера, а не в UTC.
+function masterToday() {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: MASTER_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function shiftDate(iso, days) {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function timeToMinutes(value) {
+  if (!value) return null;
+  const [h, m] = String(value).split(":").map(Number);
+  return h * 60 + m;
+}
+
+async function buildAnalytics(period) {
+  const today = masterToday();
+  const tomorrow = shiftDate(today, 1);
+  let fromDate;
+  if (period === "7") fromDate = shiftDate(today, -6);
+  else if (period === "month") fromDate = `${today.slice(0, 8)}01`;
+  else if (period === "30") fromDate = shiftDate(today, -29);
+  else {
+    const first = await pool.query(
+      `SELECT to_char(MIN((starts_at AT TIME ZONE $1)::date), 'YYYY-MM-DD') AS d FROM bookings`,
+      [MASTER_TIME_ZONE],
+    );
+    fromDate = first.rows[0]?.d || today;
+  }
+  // Москва — фиксированный UTC+3, переходов на летнее время нет.
+  const from = `${fromDate}T00:00:00+03:00`;
+  const to = `${tomorrow}T00:00:00+03:00`;
+
+  const summaryResult = await pool.query(
+    `SELECT
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE b.status = 'completed')::int AS completed,
+       COUNT(*) FILTER (WHERE b.status = 'confirmed')::int AS confirmed,
+       COUNT(*) FILTER (WHERE b.status = 'pending')::int AS pending,
+       COUNT(*) FILTER (WHERE b.status = 'cancelled')::int AS cancelled,
+       COUNT(*) FILTER (WHERE b.status = 'no_show')::int AS no_show,
+       COALESCE(SUM(s.price) FILTER (WHERE b.status = 'completed'), 0)::float8 AS revenue_done,
+       COALESCE(SUM(s.price) FILTER (WHERE b.status = 'confirmed'), 0)::float8 AS revenue_confirmed,
+       COALESCE(SUM(s.price) FILTER (WHERE b.status = 'pending'), 0)::float8 AS revenue_pending,
+       COALESCE(SUM(s.duration_minutes) FILTER (WHERE b.status IN ('completed','confirmed')), 0)::int AS busy_minutes,
+       COUNT(DISTINCT b.user_id)::int AS clients
+     FROM bookings b
+     JOIN services s ON s.id = b.service_id
+     WHERE b.starts_at >= $1 AND b.starts_at < $2`,
+    [from, to],
+  );
+
+  const byDayResult = await pool.query(
+    `SELECT (b.starts_at AT TIME ZONE $3)::date AS day,
+            COUNT(*)::int AS bookings,
+            COUNT(*) FILTER (WHERE b.status = 'completed')::int AS done,
+            COALESCE(SUM(s.price) FILTER (WHERE b.status = 'completed'), 0)::float8 AS revenue
+     FROM bookings b
+     JOIN services s ON s.id = b.service_id
+     WHERE b.starts_at >= $1 AND b.starts_at < $2
+     GROUP BY day ORDER BY day`,
+    [from, to, MASTER_TIME_ZONE],
+  );
+
+  const topServicesResult = await pool.query(
+    `SELECT s.name,
+            COUNT(*) FILTER (WHERE b.status IN ('completed','confirmed'))::int AS times,
+            COALESCE(SUM(s.price) FILTER (WHERE b.status = 'completed'), 0)::float8 AS revenue
+     FROM bookings b
+     JOIN services s ON s.id = b.service_id
+     WHERE b.starts_at >= $1 AND b.starts_at < $2
+     GROUP BY s.name
+     HAVING COUNT(*) FILTER (WHERE b.status IN ('completed','confirmed')) > 0
+     ORDER BY times DESC, revenue DESC`,
+    [from, to],
+  );
+
+  const byHourResult = await pool.query(
+    `SELECT EXTRACT(HOUR FROM (b.starts_at AT TIME ZONE $3))::int AS hour,
+            COUNT(*)::int AS bookings
+     FROM bookings b
+     WHERE b.starts_at >= $1 AND b.starts_at < $2
+       AND b.status IN ('completed','confirmed')
+     GROUP BY hour ORDER BY hour`,
+    [from, to, MASTER_TIME_ZONE],
+  );
+
+  const repeatResult = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM (
+       SELECT b.user_id FROM bookings b
+       WHERE b.starts_at >= $1 AND b.starts_at < $2
+         AND b.status IN ('completed','confirmed')
+       GROUP BY b.user_id HAVING COUNT(*) >= 2) t`,
+    [from, to],
+  );
+
+  // Загрузка: занятые часы к доступным по графику за тот же период.
+  const hoursResult = await pool.query(
+    `SELECT weekday, start_time, end_time, break_start, break_end, is_working_day FROM working_hours`,
+  );
+  const schedule = new Map(hoursResult.rows.map((row) => [Number(row.weekday), row]));
+  let availableMinutes = 0;
+  let workingDays = 0;
+  for (let day = fromDate; day < tomorrow; day = shiftDate(day, 1)) {
+    const weekday = new Date(`${day}T12:00:00Z`).getUTCDay();
+    const row = schedule.get(weekday);
+    if (!row || !row.is_working_day) continue;
+    let minutes = timeToMinutes(row.end_time) - timeToMinutes(row.start_time);
+    if (row.break_start && row.break_end) minutes -= timeToMinutes(row.break_end) - timeToMinutes(row.break_start);
+    if (minutes > 0) { availableMinutes += minutes; workingDays += 1; }
+  }
+
+  const s = summaryResult.rows[0];
+  const doneVisits = s.completed + s.confirmed;
+  return {
+    period: { code: period, from: fromDate, to: shiftDate(tomorrow, -1), workingDays },
+    summary: {
+      total: s.total,
+      completed: s.completed,
+      confirmed: s.confirmed,
+      pending: s.pending,
+      cancelled: s.cancelled,
+      no_show: s.no_show,
+      clients: s.clients,
+      revenue_done: Number(s.revenue_done),
+      revenue_confirmed: Number(s.revenue_confirmed),
+      revenue_pending: Number(s.revenue_pending),
+      avg_check: s.completed > 0 ? Math.round(Number(s.revenue_done) / s.completed) : 0,
+      losses: s.cancelled + s.no_show,
+      loss_share: s.total > 0 ? Math.round(((s.cancelled + s.no_show) / s.total) * 1000) / 10 : 0,
+      repeat_clients: repeatResult.rows[0]?.n ?? 0,
+      load_pct: availableMinutes > 0 ? Math.round((s.busy_minutes / availableMinutes) * 1000) / 10 : null,
+      available_hours: Math.round((availableMinutes / 60) * 10) / 10,
+      busy_hours: Math.round((s.busy_minutes / 60) * 10) / 10,
+      done_visits: doneVisits,
+    },
+    byDay: byDayResult.rows,
+    topServices: topServicesResult.rows,
+    byHour: byHourResult.rows,
+  };
+}
+
+// GET /api/admin/reports?period=7|30|month|all — сводка для собственника.
 router.get("/reports", requireAdmin, async (request, response) => {
+  const allowed = new Set(["7", "30", "month", "all"]);
+  const requested = String(request.query?.period ?? "30");
+  const period = allowed.has(requested) ? requested : "30";
   try {
-    // 1) Сводка по всей истории (те же строки, что читает CSV-экспорт).
-    const summaryResult = await pool.query(
-      `SELECT
-         COUNT(*) FILTER (WHERE b.status IN ('confirmed', 'completed'))::int AS done_count,
-         COALESCE(SUM(s.price) FILTER (WHERE b.status IN ('confirmed', 'completed')), 0)::float8 AS revenue,
-         COUNT(*) FILTER (WHERE b.status = 'pending')::int AS pending_count,
-         COUNT(*) FILTER (WHERE b.status = 'cancelled')::int AS cancelled_count,
-         COUNT(*) FILTER (WHERE b.status = 'no_show')::int AS no_show_count
-       FROM bookings b
-       JOIN services s ON s.id = b.service_id`,
-    );
-
-    // 2) Выручка по дням (дата в локальном времени мастера — зона параметром).
-    const byDayResult = await pool.query(
-      `SELECT (b.starts_at AT TIME ZONE $1)::date AS day,
-              COUNT(*)::int AS bookings,
-              COALESCE(SUM(s.price), 0)::float8 AS revenue
-       FROM bookings b
-       JOIN services s ON s.id = b.service_id
-       WHERE b.status IN ('confirmed', 'completed')
-       GROUP BY day
-       ORDER BY day`,
-      [REPORT_TZ],
-    );
-
-    // 3) Топ услуг (что приносит деньги — основа прайс-решений).
-    const topResult = await pool.query(
-      `SELECT s.name,
-              COUNT(*)::int AS times,
-              COALESCE(SUM(s.price), 0)::float8 AS revenue
-       FROM bookings b
-       JOIN services s ON s.id = b.service_id
-       WHERE b.status IN ('confirmed', 'completed')
-       GROUP BY s.name
-       ORDER BY times DESC, revenue DESC`,
-    );
-
-    // 4) Возвращающиеся клиенты (retention: визитов >= 2).
-    const repeatResult = await pool.query(
-      `SELECT u.first_name, u.telegram_user_id, COUNT(*)::int AS visits
-       FROM bookings b
-       JOIN users u ON u.id = b.user_id
-       WHERE b.status IN ('confirmed', 'completed')
-       GROUP BY u.id, u.first_name, u.telegram_user_id
-       HAVING COUNT(*) >= 2
-       ORDER BY visits DESC`,
-    );
-
-    return response.json({
-      summary: summaryResult.rows[0],
-      byDay: byDayResult.rows,
-      topServices: topResult.rows,
-      repeatClients: repeatResult.rows,
-    });
+    return response.json(await buildAnalytics(period));
   } catch (error) {
     console.error("reports failed:", error);
     return response.status(500).json({ error: "Unable to build reports" });

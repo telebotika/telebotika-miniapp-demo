@@ -416,6 +416,79 @@
           gap: 10px;
         }
       }
+      /* Аналитика: карточки показателей и простые полосы без внешних библиотек */
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
+      }
+
+      .stat-card {
+        padding: 12px 14px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: var(--panel);
+      }
+
+      .stat-label {
+        margin: 0 0 4px;
+        color: var(--hint);
+        font-size: 0.82rem;
+      }
+
+      .stat-value {
+        margin: 0;
+        font-size: 1.32rem;
+        font-weight: 700;
+      }
+
+      .stat-hint {
+        margin: 4px 0 0;
+        color: var(--hint);
+        font-size: 0.78rem;
+      }
+
+      .period-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+
+      .period-row .button {
+        min-height: 36px;
+        padding: 6px 12px;
+        border-radius: 10px;
+        font-size: 0.86rem;
+      }
+
+      .bar-row {
+        display: grid;
+        grid-template-columns: 64px 1fr 48px;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+        font-size: 0.86rem;
+      }
+
+      .bar-track {
+        height: 10px;
+        border-radius: 6px;
+        background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        height: 100%;
+        border-radius: 6px;
+        background: var(--accent);
+      }
+
+      .bar-value {
+        text-align: right;
+        color: var(--hint);
+      }
     </style>
   </head>
   <body>
@@ -499,8 +572,35 @@
           <h2>Журнал салона</h2>
           <p id="admin-count" class="subheading"></p>
         </div>
-        <button id="admin-export" class="button button-secondary button-small" type="button" style="margin-bottom:14px">Скачать базу клиентов (CSV)</button>
+        <div class="period-row">
+          <button id="admin-analytics" class="button button-small" type="button">📊 Аналитика салона</button>
+          <button id="admin-export" class="button button-secondary button-small" type="button">Скачать базу клиентов (CSV)</button>
+        </div>
         <div id="admin-list" class="booking-list"></div>
+      </section>
+      <section id="screen-analytics" class="screen" hidden>
+        <button id="analytics-back" class="back-button" type="button">← В журнал</button>
+        <div class="section-heading">
+          <h2>Аналитика салона</h2>
+          <p id="analytics-period" class="subheading"></p>
+        </div>
+        <div id="analytics-periods" class="period-row"></div>
+        <div id="analytics-stats" class="stat-grid"></div>
+        <div class="section-heading">
+          <h2>Выручка по дням</h2>
+          <p class="subheading">Только состоявшиеся визиты</p>
+        </div>
+        <div id="analytics-days" style="margin-bottom:18px"></div>
+        <div class="section-heading">
+          <h2>Что бронируют</h2>
+          <p class="subheading">Состоявшиеся и подтверждённые визиты</p>
+        </div>
+        <div id="analytics-services" class="booking-list" style="margin-bottom:18px"></div>
+        <div class="section-heading">
+          <h2>Популярные часы</h2>
+          <p class="subheading">Когда чаще всего записываются</p>
+        </div>
+        <div id="analytics-hours"></div>
       </section>
       <section class="card" style="margin:12px;padding:12px">
         <h2>💬 Помощник</h2>
@@ -555,7 +655,7 @@
       });
 
       const notice = document.getElementById("notice");
-      const screenNames = ["catalog", "dates", "times", "confirm", "success", "bookings", "admin"];
+      const screenNames = ["catalog", "dates", "times", "confirm", "success", "bookings", "admin", "analytics"];
 
       function currentInitDataRaw() {
         return window.Telegram?.WebApp?.initData ?? "";
@@ -1224,6 +1324,8 @@
       document.getElementById("submit-booking").addEventListener("click", submitBooking);
       document.getElementById("open-bookings").addEventListener("click", loadMyBookings);
       document.getElementById("admin-export").addEventListener("click", downloadAdminCsv);
+      document.getElementById("admin-analytics").addEventListener("click", () => loadAnalytics(analyticsState.period));
+      document.getElementById("analytics-back").addEventListener("click", () => showScreen("admin"));
       document.getElementById("success-bookings").addEventListener("click", loadMyBookings);
       document.getElementById("bookings-catalog").addEventListener("click", () => {
         setNotice();
@@ -1236,6 +1338,148 @@
         setNotice();
         showScreen("catalog");
       });
+
+      // ===== Аналитика салона =====
+      const analyticsState = { period: "30", loaded: false };
+
+      function statCard(label, value, hint) {
+        const card = document.createElement("div");
+        card.className = "stat-card";
+        const l = document.createElement("p");
+        l.className = "stat-label";
+        l.textContent = label;
+        const v = document.createElement("p");
+        v.className = "stat-value";
+        v.textContent = value;
+        card.append(l, v);
+        if (hint) {
+          const h = document.createElement("p");
+          h.className = "stat-hint";
+          h.textContent = hint;
+          card.append(h);
+        }
+        return card;
+      }
+
+      function barRow(label, value, max, suffix) {
+        const row = document.createElement("div");
+        row.className = "bar-row";
+        const name = document.createElement("span");
+        name.textContent = label;
+        const track = document.createElement("div");
+        track.className = "bar-track";
+        const fill = document.createElement("div");
+        fill.className = "bar-fill";
+        fill.style.width = `${max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0}%`;
+        track.append(fill);
+        const val = document.createElement("span");
+        val.className = "bar-value";
+        val.textContent = `${value}${suffix ?? ""}`;
+        row.append(name, track, val);
+        return row;
+      }
+
+      function renderAnalyticsPeriods() {
+        const box = document.getElementById("analytics-periods");
+        box.replaceChildren();
+        const options = [
+          ["7", "7 дней"],
+          ["30", "30 дней"],
+          ["month", "Этот месяц"],
+          ["all", "Всё время"],
+        ];
+        for (const [code, label] of options) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = code === analyticsState.period ? "button button-small" : "button button-secondary button-small";
+          btn.textContent = label;
+          btn.addEventListener("click", () => loadAnalytics(code));
+          box.append(btn);
+        }
+      }
+
+      function renderAnalytics(data) {
+        const s = data.summary;
+        const periodText = `${dateLabelFormatter.format(new Date(`${data.period.from}T12:00:00Z`))} — ${dateLabelFormatter.format(new Date(`${data.period.to}T12:00:00Z`))}`;
+        document.getElementById("analytics-period").textContent = `${periodText} · рабочих дней: ${data.period.workingDays}`;
+
+        const stats = document.getElementById("analytics-stats");
+        stats.replaceChildren(
+          statCard("Выручка состоявшихся", money(s.revenue_done), `${s.completed} визит(ов)`),
+          statCard("Подтверждено впереди", money(s.revenue_confirmed), `${s.confirmed} записей`),
+          statCard("Ждут подтверждения", money(s.revenue_pending), `${s.pending} записей`),
+          statCard("Средний чек", s.completed > 0 ? money(s.avg_check) : "—", s.completed > 0 ? "по состоявшимся" : "пока нет визитов"),
+          statCard("Загрузка", s.load_pct === null ? "—" : `${s.load_pct}%`, `${s.busy_hours} из ${s.available_hours} ч`),
+          statCard("Отмены и неявки", `${s.losses}`, `${s.loss_share}% от всех записей`),
+          statCard("Постоянные клиенты", `${s.repeat_clients}`, "2 визита и больше"),
+          statCard("Всего клиентов", `${s.clients}`, "за период"),
+        );
+
+        const days = document.getElementById("analytics-days");
+        days.replaceChildren();
+        if (data.byDay.length === 0) {
+          days.append(emptyState("За этот период записей нет."));
+        } else {
+          const max = Math.max(...data.byDay.map((d) => Number(d.revenue) || 0), 1);
+          for (const d of data.byDay) {
+            const day = new Date(d.day);
+            const label = new Intl.DateTimeFormat("ru-RU", { timeZone: MASTER_TIME_ZONE, day: "2-digit", month: "2-digit" }).format(day);
+            days.append(barRow(label, Math.round(Number(d.revenue) || 0), max, " ₽"));
+          }
+        }
+
+        const services = document.getElementById("analytics-services");
+        services.replaceChildren();
+        if (data.topServices.length === 0) {
+          services.append(emptyState("Пока нет данных по услугам."));
+        } else {
+          for (const item of data.topServices) {
+            const card = document.createElement("div");
+            card.className = "booking-card";
+            const title = document.createElement("h3");
+            title.textContent = item.name;
+            const meta = document.createElement("p");
+            meta.className = "muted";
+            meta.textContent = `${item.times} визит(ов) · ${money(item.revenue)} выручка`;
+            card.append(title, meta);
+            services.append(card);
+          }
+        }
+
+        const hours = document.getElementById("analytics-hours");
+        hours.replaceChildren();
+        if (data.byHour.length === 0) {
+          hours.append(emptyState("Пока нет данных по часам."));
+        } else {
+          const max = Math.max(...data.byHour.map((h) => Number(h.bookings) || 0), 1);
+          for (const h of data.byHour) {
+            hours.append(barRow(`${String(h.hour).padStart(2, "0")}:00`, Number(h.bookings), max));
+          }
+        }
+      }
+
+      async function loadAnalytics(period) {
+        analyticsState.period = period;
+        renderAnalyticsPeriods();
+        showScreen("analytics");
+        const container = document.getElementById("analytics-stats");
+        container.replaceChildren(emptyState("Считаю…"));
+        const params = new URLSearchParams({ period });
+        if (isDemoMaster()) params.set("demoMaster", "1");
+        params.set("initDataRaw", currentInitDataRaw());
+        try {
+          const response = await fetch(`/api/admin/reports?${params.toString()}`);
+          if (response.status === 403) {
+            setNotice("Нет доступа к аналитике. Откройте журнал через кнопку бота.", "error");
+            return;
+          }
+          if (!response.ok) throw new Error("Не удалось загрузить аналитику.");
+          renderAnalytics(await readJson(response));
+          analyticsState.loaded = true;
+        } catch (error) {
+          container.replaceChildren(emptyState(error.message || "Не удалось загрузить аналитику."));
+        }
+      }
 
       async function initialize() {
         const telegramApp = window.Telegram?.WebApp;
