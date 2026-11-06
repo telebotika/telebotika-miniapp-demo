@@ -769,8 +769,35 @@ router.post("/api/assistant", async (request, response) => {
       } else {
         lines.push("Активных записей у гостя нет — выберите услугу в каталоге.");
       }
+      // Сначала пробуем настоящий AI. Если он не настроен или упал — отвечаем по фактам каталога.
+      const answer = await askAssistant({
+        nextBooking: row
+          ? {
+              service: row.service,
+              when: new Date(row.starts_at).toLocaleString("ru-RU", {
+                timeZone: MASTER_TIME_ZONE,
+                day: "numeric",
+                month: "long",
+                hour: "2-digit",
+                minute: "2-digit",
+              }),
+              price: Number(row.price),
+            }
+          : null,
+        services: services.map((service) => ({
+          id: Number(service.id ?? 0),
+          name: service.name,
+          price: Number(service.price),
+          durationMinutes: Number(service.duration_minutes),
+          minutes: Number(service.duration_minutes),
+        })),
+        question: questionText || undefined,
+      });
+      if (answer.provider === "gigachat") {
+        return response.json({ provider: "gigachat", answer: answer.answer });
+      }
       lines.push(
-        `Это демо-ответ по данным каталога, а не разговор с AI. Записаться можно в разделе «Услуги». Мастер: ${brandName}.`,
+        `AI сейчас недоступен, поэтому отвечаю по каталогу. Записаться можно в разделе «Услуги». Мастер: ${brandName}.`,
       );
       return response.json({ provider: "demo", answer: lines.join(" ") });
     } catch {

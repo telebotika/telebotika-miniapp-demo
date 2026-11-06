@@ -135,7 +135,10 @@ function buildMessages(context) {
   const services = Array.isArray(context?.services) ? context.services : [];
   const servicesLine = services.length
     ? `Услуги и цены: ${services
-        .map((s) => `${s.name} — ${s.price} руб, ${s.minutes} мин`)
+        .map(
+          (s) =>
+            `${s.name} — ${s.price} руб, ${s.minutes ?? s.durationMinutes ?? "?"} мин`,
+        )
         .join("; ")}. Называй цены только из этого списка и дословно; не придумывай цены, скидки или услуги вне списка.`
     : "Прайс услуг в контексте пуст: не называй цены совсем.";
   const promptContext = {

@@ -10,6 +10,9 @@
   external_node_modules = ["express","pg","serverless-http"]
   node_bundler = "esbuild"
 
+# Сертификат Минцифры нужен для GigaChat (иначе TLS: SELF_SIGNED_CERT_IN_CHAIN).
+included_files = ["certs/**"]
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/api/:splat"
