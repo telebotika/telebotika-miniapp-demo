@@ -351,14 +351,20 @@ router.get("/api/working-hours", async (_request, response) => {
 
 router.get("/api/my-bookings", async (request, response) => {
   const validation = validateInitData(request.query.initDataRaw);
-  if (!validation.valid) {
+  // Демо-режим: показываем записи гостя, созданные из браузера (только при DEMO_MODE=1).
+  const demoIdentity =
+    process.env.DEMO_MODE === "1"
+      ? { userId: 1000000001, firstName: "Гость (демо)" }
+      : null;
+  if (!validation.valid && !demoIdentity) {
     return response.status(403).json({ error: "Invalid signature" });
   }
+  const viewerId = validation.valid ? validation.userId : demoIdentity.userId;
 
   try {
     const result = await queryDatabase(
       "SELECT bookings.id, users.telegram_user_id AS user_id, bookings.service_id, services.name AS service_name, services.price AS service_price, bookings.starts_at, bookings.ends_at, bookings.status, bookings.comment, bookings.created_at FROM bookings JOIN users ON users.id = bookings.user_id JOIN services ON services.id = bookings.service_id WHERE users.telegram_user_id = $1 ORDER BY bookings.starts_at DESC",
-      [String(validation.userId)],
+      [String(viewerId)],
     );
     return response.json(
       result.rows.map((booking) => ({

@@ -29,14 +29,21 @@ const MASTER_TIME_ZONE = "Europe/Moscow";
 function requireAdmin(request, response, next) {
   const initDataRaw = request.query?.initDataRaw ?? request.body?.initDataRaw;
   const validation = validateInitData(initDataRaw);
-  if (!validation.valid) {
+  // Демо-режим: журнал мастера открывается по ?master=1 (только при DEMO_MODE=1).
+  // Нужен для показа кабинета и выгрузки на тестовых данных.
+  const demoMaster =
+    process.env.DEMO_MODE === "1" &&
+    (request.query?.demoMaster === "1" || request.body?.demoMaster === "1");
+  if (!validation.valid && !demoMaster) {
     return response.status(403).json({ error: "Invalid signature" });
   }
   const adminId = Number(process.env.ADMIN_CHAT_ID);
-  if (adminId !== validation.userId) {
+  if (!demoMaster && adminId !== validation.userId) {
     return response.status(403).json({ error: "Not an admin" });
   }
-  request.adminUser = validation; // запоминаем, кто вошёл, для следующих шагов
+  request.adminUser = validation.valid
+    ? validation
+    : { userId: 1000000001, firstName: "Гость (демо)", demo: true };
   next(); // пропускаем дальше, к маршруту
 }
 

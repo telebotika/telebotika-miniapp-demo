@@ -1009,10 +1009,17 @@
       // Пробник роли: стучимся в кабинет. Сервер сам решает (подпись + ADMIN_CHAT_ID),
       // клиент видит только вердикт 200/403 и НЕ знает секретного ID.
       // Возвращает массив строк журнала, если мастер; null — если клиент/ошибка/не в Telegram.
+      // Демо: кабинет мастера открывается адресом ?master=1 (только при DEMO_MODE=1 на сервере).
+      function isDemoMaster() {
+        return new URLSearchParams(window.location.search).get("master") === "1";
+      }
+
       async function probeAdmin() {
         const initDataRaw = currentInitDataRaw();
-        if (!initDataRaw) return null; // открыто вне Telegram -> клиентский режим
+        const demoMaster = isDemoMaster();
+        if (!initDataRaw && !demoMaster) return null; // вне Telegram -> клиентский режим
         const params = new URLSearchParams({ initDataRaw });
+        if (demoMaster) params.set("demoMaster", "1");
         try {
           const response = await fetch(`/api/admin/bookings?${params.toString()}`);
           if (response.status !== 200) return null; // 403 или иное -> клиент
@@ -1040,7 +1047,7 @@
           const response = await fetch(`/api/admin/bookings/${bookingId}/${action}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ initDataRaw }),
+            body: JSON.stringify({ initDataRaw, demoMaster: isDemoMaster() ? "1" : undefined }),
           });
 
           if (response.status === 200) {
@@ -1075,7 +1082,8 @@
       // Голая <a href> дала бы 403, потому что браузер не приложил бы initData.
       async function downloadAdminCsv() {
         const initDataRaw = currentInitDataRaw();
-        if (!initDataRaw) {
+        const demoMaster = isDemoMaster();
+        if (!initDataRaw && !demoMaster) {
           setNotice("Нет Telegram-подписи. Откройте журнал через кнопку бота.", "error");
           return;
         }
@@ -1084,6 +1092,7 @@
         setNotice();
         try {
           const params = new URLSearchParams({ initDataRaw });
+          if (demoMaster) params.set("demoMaster", "1");
           const response = await fetch(`/api/admin/export.csv?${params.toString()}`);
           if (response.status === 403) {
             setNotice("Не удалось подтвердить доступ мастера. Обновите страницу.", "error");
